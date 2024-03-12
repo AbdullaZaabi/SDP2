@@ -1,0 +1,567 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity =0.8.24;
+
+
+//begin of registration smart contract
+contract Registration{
+ 
+   address FDA;  //0x5B38Da6a701c568545dCfcB03FcB875f56beddC4
+ 
+   mapping(address=>bool) Manufacturer; //0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
+   mapping(address=>bool) Distributer; //0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db
+   mapping(address=>bool) HPP; //0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB
+ 
+   modifier onlyFDA{
+     require(msg.sender == FDA,
+     "Sender not authorized."
+     );
+     _;
+   }
+ 
+   constructor() {
+       FDA=msg.sender;
+   }
+ 
+   function RegisterManufacturer(address m) public onlyFDA{
+       require(!Manufacturer[m],
+       "Manufacturer exists already"
+       );
+     
+       Manufacturer[m]=true;
+   }
+ 
+   function RegisterDistributer(address d) public onlyFDA{
+       require(!Distributer[d],
+       "Distributer exists already"
+       );
+     
+       Distributer[d]=true;
+   }
+ 
+   function RegisterHPP(address h) public onlyFDA{
+       require(!HPP[h],
+       "HPP exists already"
+       );
+     
+       HPP[h]=true;
+   }
+ 
+   function isFDA(address f) public view returns(bool){
+       return (FDA==f);
+   }
+ 
+   function ManufacturerExists(address m) public view returns(bool){
+       return Manufacturer[m];
+   }
+ 
+   function DistributerExists(address d) public view returns(bool){
+       return Distributer[d];
+   }
+ 
+   function HPPExists(address h) public view returns(bool){
+       return HPP[h];
+   }
+}
+// end of registartion smart contract
+
+
+
+
+// begin of counterfeit smart contract
+contract CounterfeitHandler{
+   uint InitTime;
+   uint CompTime;
+   bool Penalty;
+
+
+   address payable FDA;  
+ 
+   Registration RegistrationContract;
+
+
+   enum status{
+    Pending,
+    Accepted,
+    Rejected,
+    Received,
+    Uploaded,
+    Present,
+    NotPresent,
+    Available,
+    NotAvailable
+   }
+
+
+constructor(address registration) {
+   RegistrationContract=Registration(registration);
+
+
+
+
+
+ if(!RegistrationContract.isFDA(msg.sender))
+       revert("Sender not authorized");
+}
+modifier onlyRequestor1 {
+       require(RegistrationContract.HPPExists(msg.sender),
+       "Sender not authorized.");
+       _;
+   }
+
+  modifier onlyReceiver1 {
+       require(RegistrationContract.isFDA(msg.sender),
+       "Sender not authorized.");
+       _;
+  }
+
+  modifier onlyReporter {
+       require(RegistrationContract.isFDA(msg.sender),
+       "Sender not authorized.");
+       _;
+   }
+
+   modifier onlyRequestor2 {
+       require(RegistrationContract.isFDA(msg.sender),
+       "Sender not authorized.");
+       _;
+   }
+
+    modifier onlyReceiver2 {
+       require(RegistrationContract.ManufacturerExists(msg.sender),
+       "Sender not authorized.");
+       _;
+    }
+
+
+
+
+    modifier onlyInitiator {
+       require(RegistrationContract.ManufacturerExists(msg.sender),
+       "Sender not authorized.");
+       _;
+    }
+
+
+
+
+    modifier onlyReceiver3 {
+       require(RegistrationContract.isFDA(msg.sender),
+       "Sender not authorized.");
+       _;
+    }
+ 
+    modifier onlyRequestor3 {
+       require(RegistrationContract.DistributerExists(msg.sender),
+       "Sender not authorized.");
+       _;
+    }
+
+    modifier onlyReceiver4 {
+       require(RegistrationContract.HPPExists(msg.sender),
+       "Sender not authorized.");
+       _;
+    }
+
+
+
+
+    modifier onlyReceiver5 {
+       require(RegistrationContract.ManufacturerExists(msg.sender),
+       "Sender not authorized.");
+       _;
+    }
+
+// to define a set of variables for the function ReportFalsifiedMedicine
+  struct FalsifiedMedicineReportdetails{
+      address Receiver1;
+      address Requestor1;
+
+
+
+
+      string MedicineID;
+      string MedicineName;
+      string SerialNumber;
+      string BatchNumber;
+
+
+      status FalsifiedMedicineReportdetailsStatus;
+    }
+ 
+   mapping(bytes32=>FalsifiedMedicineReportdetails) public GetFalsifiedMedicineReportID;
+
+  event FalsifiedMedicineReported(bytes32 FalsifiedMedicineReportID, address Requestor1, address Receiver1, string MedicineID, string MedicineName, string SerialNumber, string BatchNumber);
+  event StatusUpdated(bytes32 FalsifiedMedicineReportID, status newStatus);
+
+
+  function ReportFalsifiedMedicine(address Receiver1, string memory MedicineID, string memory MedicineName, string memory SerialNumber, string memory BatchNumber) public onlyRequestor1{
+    require(RegistrationContract.isFDA(Receiver1),
+    "FDA's address is not valid.");
+    InitTime=16;
+    bytes32 temp=keccak256(abi.encodePacked(msg.sender,block.timestamp,address(this), MedicineID, MedicineName, SerialNumber, BatchNumber));
+    GetFalsifiedMedicineReportID[temp]=FalsifiedMedicineReportdetails(Receiver1, msg.sender, MedicineID, MedicineName, SerialNumber, BatchNumber, status.Pending);    
+    emit FalsifiedMedicineReported(temp, Receiver1, msg.sender, MedicineID, MedicineName, SerialNumber, BatchNumber);
+  }
+
+
+  function ConfirmDefectRequest(bytes32 FalsifiedMedicineReportID, bool AcceptRequest) public onlyReceiver1{
+    require(GetFalsifiedMedicineReportID[FalsifiedMedicineReportID].Receiver1 == msg.sender,
+    "Sender not authorized."
+    );
+    require(GetFalsifiedMedicineReportID[FalsifiedMedicineReportID].FalsifiedMedicineReportdetailsStatus==status.Pending);
+   
+    if(AcceptRequest){
+        GetFalsifiedMedicineReportID[FalsifiedMedicineReportID].FalsifiedMedicineReportdetailsStatus=status.Accepted;
+    }
+    else{
+        GetFalsifiedMedicineReportID[FalsifiedMedicineReportID].FalsifiedMedicineReportdetailsStatus=status.Rejected;
+    }
+   
+    emit StatusUpdated(FalsifiedMedicineReportID, GetFalsifiedMedicineReportID[FalsifiedMedicineReportID].FalsifiedMedicineReportdetailsStatus);
+  }
+
+
+//Investigation request segment
+  struct InvestigationRequestDetails{
+    address Requestor2;
+    address Receiver2;
+    bytes32 FalsifiedMedicineReportID;
+    status InvestigationRequestStatus;
+  }    
+
+  mapping(bytes32=>InvestigationRequestDetails) public GetInvestigationRequestID;
+
+  event InvestigationRequestPlaced(bytes32 InvestigationRequestID, address Requestor2, address Receiver2, bytes32 FalsifiedMedicineReportID);
+
+
+  function PlaceInvestigationRequest(address Receiver2, bytes32 FalsifiedMedicineReportID) public onlyRequestor2{
+    require(RegistrationContract.ManufacturerExists(Receiver2),
+    "Manufacturer's address is not valid.");
+    bytes32 temp=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), FalsifiedMedicineReportID));
+    GetInvestigationRequestID[temp]=InvestigationRequestDetails(Receiver2, msg.sender, FalsifiedMedicineReportID,status.Pending );
+   
+    emit InvestigationRequestPlaced (temp, Receiver2, msg.sender, FalsifiedMedicineReportID);
+  }
+
+
+  event InvestigationRequestStatusUpdated(bytes32 InvestigationRequestID, status newStatus);
+
+  function ConfirmInvestigationRequest(bytes32 InvestigationRequestID, bool accepted) public onlyReceiver2{
+    require(GetInvestigationRequestID[InvestigationRequestID].Receiver2==msg.sender,
+    "Sender not authorized."
+    );
+    require(GetInvestigationRequestID[InvestigationRequestID].InvestigationRequestStatus==status.Pending);
+   
+    if(accepted){
+        (GetInvestigationRequestID[InvestigationRequestID].InvestigationRequestStatus=status.Accepted);
+    }
+    else{
+        (GetInvestigationRequestID[InvestigationRequestID].InvestigationRequestStatus=status.Rejected);
+    }
+    emit InvestigationRequestStatusUpdated(InvestigationRequestID, GetInvestigationRequestID[InvestigationRequestID].InvestigationRequestStatus);
+  }
+
+//End of investigation request segment
+
+
+//Investigation report segment
+  struct InvestigationReportDetails{
+    address Reporter;
+    address Receiver2;
+    bytes32 InvestigationRequestID;
+    status InvestigationReportStatus;
+  }
+
+
+  mapping (bytes32=>InvestigationReportDetails) public GetInvestigationReportID;
+
+  event InvestigationReportCreated(bytes32 InvestigationReportID, bytes32 InvestigationRequestID, address Reporter, address Receiver2);
+
+
+  function CreateInvestigationReport(address Reporter, address Receiver2, bytes32 InvestigationRequestID) public onlyReporter{
+        require(RegistrationContract.isFDA(Reporter),
+        "Creator's address is not authorized.");
+        require(RegistrationContract.ManufacturerExists(Receiver2),
+        "Receiver's address is not authorized.");
+        bytes32 temp1 = keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), InvestigationRequestID));
+        GetInvestigationReportID[temp1] = InvestigationReportDetails(Reporter, Receiver2, InvestigationRequestID, status.Pending);
+   
+        emit InvestigationReportCreated(temp1, InvestigationRequestID, Reporter, Receiver2);
+    }
+
+    event InvestigationReportUploaded(bytes32 InvestigationReportID, status newStatus, address Reporter,  address Receiver2, string IPFS);
+
+
+    function UploadInvestigationReport(bytes32 InvestigationReportID, bool Uploaded, address Reporter,  address Receiver2, string memory IPFS_Hash) public onlyReporter{
+    require(GetInvestigationReportID[InvestigationReportID].Reporter==msg.sender,
+    "Sender not authorized."
+    );
+    require(RegistrationContract.ManufacturerExists(Receiver2),
+    "Manufacturer's address is not valid.");
+    require(GetInvestigationReportID[InvestigationReportID].InvestigationReportStatus==status.Pending);
+   
+    if(Uploaded){
+        (GetInvestigationReportID[InvestigationReportID].InvestigationReportStatus=status.Available);
+    }
+    else{
+        (GetInvestigationReportID[InvestigationReportID].InvestigationReportStatus=status.NotAvailable);
+    }
+    emit InvestigationReportUploaded(InvestigationReportID, GetInvestigationReportID[InvestigationReportID].InvestigationReportStatus, Reporter, Receiver2, IPFS_Hash);
+    }
+
+
+
+//Start of ConfirmCounterfeitMedicine() function
+  struct CounterfeitPresencedetails{
+    address Reporter;
+    address Receiver2;
+
+    status CounterfeitPresence;
+  }
+
+
+  mapping (bytes32=>CounterfeitPresencedetails) public GetCounterfeitConfirmationNumber;
+
+  event CounterfeitConfirmationNumberCreated(bytes32 CounterfeitConfirmationNumber, address Receiver2);
+  event CounterfeitConfirmed(bytes32 CounterfeitConfirmationNumber, status FalsifiedMedicinePresence, address Reporter, address Receiver2);
+
+  function CreateCounterfeitConfirmationNumber(bytes32 InvestigationReportID,  address Receiver2) public onlyReceiver2{
+    require(RegistrationContract.ManufacturerExists(Receiver2),
+    "FDA address is not valid.");
+    bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), InvestigationReportID));
+   
+    GetCounterfeitConfirmationNumber[temp2]=CounterfeitPresencedetails(Receiver2, msg.sender, status.Pending);
+
+    emit CounterfeitConfirmationNumberCreated(temp2, Receiver2);
+  }
+
+  function ConfirmCounterfeitMedicine(bytes32 CounterfeitConfirmationNumber, address Reporter, address Receiver2, bool present) public onlyReceiver2{
+   
+
+    require(GetCounterfeitConfirmationNumber[CounterfeitConfirmationNumber].Reporter==msg.sender,
+    "Sender not authorized."
+    );
+   
+    if (present){
+      GetCounterfeitConfirmationNumber[CounterfeitConfirmationNumber].CounterfeitPresence=status.Present;
+    }
+    else{
+      GetCounterfeitConfirmationNumber[CounterfeitConfirmationNumber].CounterfeitPresence=status.NotPresent;
+    }
+
+
+    emit CounterfeitConfirmed(CounterfeitConfirmationNumber, GetCounterfeitConfirmationNumber[CounterfeitConfirmationNumber].CounterfeitPresence, Reporter, Receiver2);
+  }
+
+
+//FDA request from Distributor to locate
+    struct RequestToLocateDetails{
+        address Receiver4;
+        address Requestor4;
+
+    }
+
+
+    mapping(bytes32 => RequestToLocateDetails) public GetRequestToLocateNumber;
+
+
+    event RequestToLocateReceived(bytes32 RequestToLocateNumber);
+
+
+    function RequestToLocate(bytes32 CounterfeitConfirmationNumber, bytes32 RequestToLocateNumber, address Receiver4, address Requestor4) public onlyReceiver4{
+        require(RegistrationContract.isFDA(Receiver4),
+        "FDA address is not valid.");
+        bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), CounterfeitConfirmationNumber));
+   
+        GetRequestToLocateNumber[temp2]=RequestToLocateDetails(Requestor4, msg.sender);
+
+
+
+
+        emit LocationRequestSent(RequestToLocateNumber, Requestor4);
+    }   
+
+
+//Location Request functions
+    struct LocationRequestDetails{
+        address Requestor3;
+        address Receiver4;
+
+
+
+        status LocationRequestStatus;
+    }
+
+
+
+
+    mapping(bytes32 => LocationRequestDetails) public GetLocationRequestNumber;
+
+
+
+
+    event LocationRequestSent(bytes32 LocationRequestNumber, address Receiver4);
+   
+    function RequestLocation(bytes32 LocationRequestNumber, bytes32 RequestToLocateNumber, address Receiver4, address Requestor3) public onlyRequestor3{
+        require(RegistrationContract.DistributerExists(Requestor3),
+        "Distributer address is not valid.");
+        bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), RequestToLocateNumber));
+   
+        GetLocationRequestNumber[temp2]=LocationRequestDetails(Receiver4, msg.sender, status.Pending);
+
+
+
+
+        emit LocationRequestSent(LocationRequestNumber, Receiver4);
+    }
+
+
+
+
+    event LocationRequestReceived(bytes32 LocationRequestNumber, status newStatus);
+
+
+
+
+    function ReceiveLocationRequest(bytes32 LocationRequestNumber, bool received) public onlyReceiver4{
+        require(GetLocationRequestNumber[LocationRequestNumber].Receiver4==msg.sender,
+        "Sender not authorized."
+        );
+        require(GetLocationRequestNumber[LocationRequestNumber].LocationRequestStatus==status.Pending);
+   
+        if (received){
+            GetLocationRequestNumber[LocationRequestNumber].LocationRequestStatus=status.Accepted;
+        }
+        else{
+            GetLocationRequestNumber[LocationRequestNumber].LocationRequestStatus=status.Rejected;
+        }
+
+
+
+
+        emit LocationRequestReceived(LocationRequestNumber, GetLocationRequestNumber[LocationRequestNumber].LocationRequestStatus);
+    }
+
+
+
+
+//Location Details Functions
+    struct LocationDetails{
+        address Requestor3;
+        address Receiver4;
+
+        string FacilityName;
+        string Coordinate;
+
+        status LocationDetailsStatus;
+    }
+    event LocationSent(bytes32 LocationDetailsID, string FacilityName, string Coordinate);
+
+
+
+
+    mapping(bytes32 => LocationDetails) public GetLocationDetailsID;
+
+
+    function SendLocation(bytes32 LocationRequestNumber, bytes32 LocationDetailsID, string memory FacilityName, string memory Coordinate, address Requestor3, address Receiver4) public onlyReceiver4{
+        require(RegistrationContract.DistributerExists(Receiver4),
+        "Distributer address is not valid.");
+        bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), LocationRequestNumber));
+   
+        GetLocationDetailsID[temp2]=LocationDetails(Requestor3, msg.sender, FacilityName, Coordinate, status.Pending);
+
+
+
+
+        emit LocationSent(LocationDetailsID, FacilityName, Coordinate);
+    }
+
+
+
+
+    event LocationReceived(bytes32 LocationDetailsID, status newStatus);
+
+
+
+
+    function ReceiveLocation(bytes32 LocationDetailsID, bool received) public onlyRequestor3{
+        require(GetLocationDetailsID[LocationDetailsID].Requestor3==msg.sender,
+        "Sender not authorized."
+        );
+        require(GetLocationDetailsID[LocationDetailsID].LocationDetailsStatus==status.Pending);
+   
+        if (received){
+            GetLocationDetailsID[LocationDetailsID].LocationDetailsStatus=status.Accepted;
+        }
+        else{
+            GetLocationDetailsID[LocationDetailsID].LocationDetailsStatus=status.Rejected;
+        }
+
+        emit LocationReceived (LocationDetailsID, GetLocationDetailsID[LocationDetailsID].LocationDetailsStatus);
+    }
+
+
+
+
+//Start collection function
+    struct CollectionRequestDetails{
+        address Requestor3;
+        address Receiver4;
+       
+
+   
+        status CollectionStatus;
+    }
+
+
+
+
+    mapping(bytes32 => CollectionRequestDetails) public GetCollectionRequestNumber;
+
+
+
+
+    event CollectionRequestPlaced (bytes32 CollectionRequestNumber, address Requestor3, address Receiver4);
+
+
+
+
+    function PlaceCollectionRequest (bytes32 LocationDetailsID, address Receiver4) public onlyRequestor3{
+        require(RegistrationContract.HPPExists(Receiver4),
+        "HPP's address is not valid.");
+        InitTime=16;
+        bytes32 temp=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), LocationDetailsID));
+
+
+        GetCollectionRequestNumber[temp]=CollectionRequestDetails(msg.sender, Receiver4, status.Pending);
+   
+        emit CollectionRequestPlaced(temp, msg.sender, Receiver4);
+    }
+
+
+
+
+    event CollectionRequestConfirmed(bytes32 CollectionRequestNumber, status newStatus);
+
+
+
+
+    function ConfirmCollectionRequest(bytes32 CollectionRequestNumber, bool accepted) public onlyReceiver4{
+        require(GetCollectionRequestNumber[CollectionRequestNumber].Receiver4 == msg.sender,
+        "Sender not authorized."
+        );
+        require(GetCollectionRequestNumber[CollectionRequestNumber].CollectionStatus==status.Pending);
+   
+        if(accepted){
+            GetCollectionRequestNumber[CollectionRequestNumber].CollectionStatus=status.Accepted;
+        }
+        else{
+            GetCollectionRequestNumber[CollectionRequestNumber].CollectionStatus=status.Rejected;
+        }
+
+
+
+
+        emit CollectionRequestConfirmed (CollectionRequestNumber, GetCollectionRequestNumber[CollectionRequestNumber].CollectionStatus);
+    }
+}
