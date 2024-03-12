@@ -72,7 +72,7 @@ contract RecallHandler{
    uint InitTime;
    uint CompTime;
    bool Penalty;
-// to charge the FDA for the initiation of this contract.
+
    address payable FDA;  
  
    Registration RegistrationContract;
@@ -95,16 +95,12 @@ contract RecallHandler{
    }
 
 
-/*constructor is a special function that is executed only once when the smart contract is deployed.
-Its purpose is typically to initialize the contract's state variables or perform any one-time setup operations*/
 constructor(address registration) {
    RegistrationContract=Registration(registration);
 
 
 
 
-/*This line checks if the sender's address (msg.sender) is authorized based on the HPPExists function in the Registration contract. If HPPExists returns false (indicating that the sender is not authorized),
-the transaction is reverted with an error message.*/  
  if(!RegistrationContract.isFDA(msg.sender))
        revert("Sender not authorized");
 }
@@ -113,14 +109,12 @@ the transaction is reverted with an error message.*/
        "Sender not authorized.");
        _;
    }
+
   modifier onlyReceiver1 {
        require(RegistrationContract.isFDA(msg.sender),
        "Sender not authorized.");
        _;
   }
-
-
-
 
   modifier onlyReporter {
        require(RegistrationContract.isFDA(msg.sender),
@@ -128,75 +122,62 @@ the transaction is reverted with an error message.*/
        _;
    }
 
-
-
-
    modifier onlyRequestor2 {
        require(RegistrationContract.isFDA(msg.sender),
        "Sender not authorized.");
        _;
    }
 
-
-
-
-  modifier onlyReceiver2 {
+    modifier onlyReceiver2 {
        require(RegistrationContract.ManufacturerExists(msg.sender),
        "Sender not authorized.");
        _;
-   }
+    }
 
 
 
 
-   modifier onlyInitiator {
+    modifier onlyInitiator {
        require(RegistrationContract.ManufacturerExists(msg.sender),
        "Sender not authorized.");
        _;
-   }
+    }
 
 
 
 
-   modifier onlyReceiver3 {
+    modifier onlyReceiver3 {
        require(RegistrationContract.isFDA(msg.sender),
        "Sender not authorized.");
        _;
-   }
-
-
-
-
-   modifier onlyRequestor3 {
+    }
+ 
+    modifier onlyRequestor3 {
        require(RegistrationContract.DistributerExists(msg.sender),
        "Sender not authorized.");
        _;
-   }
+    }
 
-
-
-
-   modifier onlyReceiver4 {
+    modifier onlyReceiver4 {
        require(RegistrationContract.HPPExists(msg.sender),
        "Sender not authorized.");
        _;
-   }
+    }
 
 
 
 
-   modifier onlyReceiver5 {
+    modifier onlyReceiver5 {
        require(RegistrationContract.ManufacturerExists(msg.sender),
        "Sender not authorized.");
        _;
-   }
-// to define a set of variables for the function ReportFalsifiedMedicine
+    }
+
+
+
   struct FalsifiedMedicineReportdetails{
       address Receiver1;
       address Requestor1;
-
-
-
 
       string MedicineID;
       string MedicineName;
@@ -449,6 +430,31 @@ the transaction is reverted with an error message.*/
     emit RecallNoticeReceived (RecallNoticeNumber, GetRecallNoticeNumber[RecallNoticeNumber].RecallNoticeStatus );
   }
 
+//Manufcaturer request from Distributor to locate
+    struct RequestToLocateDetails{
+        address Initiator;
+        address Requestor4;
+
+    }
+
+
+    mapping(bytes32 => RequestToLocateDetails) public GetRequestToLocateNumber;
+
+
+    event RequestToLocateReceived(bytes32 RequestToLocateNumber);
+
+
+    function RequestToLocate(bytes32 RecallNoticeNumber, bytes32 RequestToLocateNumber, address Initiator, address Requestor4) public onlyInitiator{
+        require(RegistrationContract.ManufacturerExists(Initiator),
+        "Manufacturer address is not valid.");
+        bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), RecallNoticeNumber));
+   
+        GetRequestToLocateNumber[temp2]=RequestToLocateDetails(Requestor4, msg.sender);
+
+
+        emit LocationRequestSent(RequestToLocateNumber, Requestor4);
+    }
+
 
 //Location Request functions
     struct LocationRequestDetails{
@@ -470,10 +476,10 @@ the transaction is reverted with an error message.*/
 
     event LocationRequestSent(bytes32 LocationRequestNumber, address Receiver4);
    
-    function RequestLocation(bytes32 LocationRequestNumber, bytes32 RecallNoticeNumber, address Receiver4, address Requestor3) public onlyRequestor3{
+    function RequestLocation(bytes32 LocationRequestNumber, bytes32 RequestToLocateNumber, address Receiver4, address Requestor3) public onlyRequestor3{
         require(RegistrationContract.DistributerExists(Requestor3),
         "Distributer address is not valid.");
-        bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), RecallNoticeNumber));
+        bytes32 temp2=keccak256(abi.encodePacked(msg.sender, block.timestamp, address(this), RequestToLocateNumber));
    
         GetLocationRequestNumber[temp2]=LocationRequestDetails(Receiver4, msg.sender, status.Pending);
 
